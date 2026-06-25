@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Globe Country Guesser</title>
+  
+  <script src="https://unpkg.com/globe.gl"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #000;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #globeViz {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Game UI Panel Overlay - Moved to Bottom Center */
+    #ui-panel {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%); /* Perfectly centers the div */
+      background: rgba(20, 25, 30, 0.9);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+      z-index: 10;
+      width: 350px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+
+    .status-text {
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+      text-align: center;
+      color: #aaa;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      box-sizing: border-box;
+      margin-bottom: 15px;
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #2a2a2a;
+      color: white;
+      font-size: 1rem;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #00ffff;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #btn-guess { background-color: #28a745; color: white; }
+    #btn-guess:hover { background-color: #218838; }
+    
+    #btn-giveup { background-color: #dc3545; color: white; }
+    #btn-giveup:hover { background-color: #c82333; }
+    
+    #btn-next { background-color: #007bff; color: white; display: none; width: 100%; }
+    #btn-next:hover { background-color: #0069d9; }
+
+    #message {
+      text-align: center;
+      font-weight: bold;
+      min-height: 20px;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui-panel">
+    <h1>Globe Guesser</h1>
+    <div class="status-text">
+      Guesses remaining: <span id="guesses-left"></span>
+    </div>
+    
+    <input type="text" id="country-input" list="country-list" placeholder="Enter country name..." autocomplete="off">
+    <datalist id="country-list"></datalist>
+
+    <div class="btn-group" id="action-buttons">
+      <button id="btn-guess">Guess</button>
+      <button id="btn-giveup">Give Up</button>
+    </div>
+
+    <button id="btn-next">Next Country ➔</button>
+
+    <div id="message">Loading map data...</div>
+  </div>
+
+  <div id="globeViz"></div>
+
+  <script>
+    // --- Configuration ---
+    const MAX_GUESSES = 3;
+    const ZOOM_ALTITUDE = 0.4;
+    
+    // --- State Variables ---
+    let countriesData = [];
+    let currentTarget = null;
+    let guessesRemaining = MAX_GUESSES;
+    let isRoundActive = false;
+    let roundWon = false; 
+
+    // --- DOM Elements ---
+    const uiInput = document.getElementById('country-input');
+    const uiGuessesLeft = document.getElementById('guesses-left');
+    const uiMessage = document.getElementById('message');
+    const uiDatalist = document.getElementById('country-list');
+    const btnGuess = document.getElementById('btn-guess');
+    const btnGiveUp = document.getElementById('btn-giveup');
+    const btnNext = document.getElementById('btn-next');
+    const actionButtons = document.getElementById('action-buttons');
+
+    // --- Initialize Globe.gl ---
+    const world = Globe()
+      (document.getElementById('globeViz'))
+      // Using highly reliable raw github URLs to ensure the textures load
+      .globeImageUrl('https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg')
+      .bumpImageUrl('https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-topology.png')
+      
+      // The magic combination to make borders perfectly flat:
+      .polygonAltitude(0.005) // Tiny altitude to prevent flickering
+      .polygonSideColor(() => 'rgba(0, 0, 0, 0)') // Makes the 3D walls completely invisible!
+      
+      .polygonStrokeColor(() => '#00FFFF') // Changed border color to Cyan
+      .polygonCapColor((feat) => {
+        if (currentTarget && feat === currentTarget) {
+          if (isRoundActive) {
+            return 'rgba(255, 255, 255, 1)'; // Yellow
+          } else if (roundWon) {
+            return 'rgba(40, 167, 69, 0.8)'; // Green
+          } else {
+            return 'rgba(220, 53, 69, 0.8)'; // Red
+          }
+        }
+        return 'rgba(200, 200, 200, 0.1)'; // Slightly more transparent default countries
+      });
+
+    // --- Fetch GeoJSON Data ---
+    fetch('https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
+      .then(res => res.json())
+      .then(data => {
+        countriesData = data.features.filter(d => d.properties.ADMIN !== 'Antarctica');
+        world.polygonsData(countriesData);
+        populateDatalist();
+        startNewRound();
+      });
+
+    // --- Core Functions ---
+    function populateDatalist() {
+      const names = countriesData.map(c => c.properties.ADMIN).sort();
+      names.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        uiDatalist.appendChild(option);
+      });
+    }
+
+    function getPolygonCenter(geometry) {
+      let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+      const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates[0][0];
+      
+      coords.forEach(([lng, lat]) => {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      });
+      return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
+    }
+
+    function startNewRound() {
+      isRoundActive = true;
+      guessesRemaining = MAX_GUESSES;
+      roundWon = false; 
+      uiInput.value = '';
+      uiInput.disabled = false;
+      
+      uiGuessesLeft.innerText = guessesRemaining;
+      uiMessage.innerText = 'Good luck!';
+      uiMessage.style.color = 'white';
+      actionButtons.style.display = 'flex';
+      btnNext.style.display = 'none';
+
+      const randomIndex = Math.floor(Math.random() * countriesData.length);
+      currentTarget = countriesData[randomIndex];
+
+      world.polygonsData(countriesData);
+
+      const center = getPolygonCenter(currentTarget.geometry);
+      world.pointOfView({ lat: center.lat, lng: center.lng, altitude: ZOOM_ALTITUDE }, 2000);
+      
+      uiInput.focus();
+    }
+
+    function handleGuess() {
+      if (!isRoundActive) return;
+
+      const userGuess = uiInput.value.trim().toLowerCase();
+      const correctAnswer = currentTarget.properties.ADMIN.toLowerCase();
+
+      if (userGuess === correctAnswer) {
+        endRound(true);
+      } else {
+        guessesRemaining--;
+        uiGuessesLeft.innerText = guessesRemaining;
+        
+        if (guessesRemaining <= 0) {
+          endRound(false);
+        } else {
+          uiMessage.innerText = 'Incorrect, try again!';
+          uiMessage.style.color = '#ffc107'; 
+          uiInput.value = '';
+          uiInput.focus();
+        }
+      }
+    }
+
+    function endRound(won) {
+      isRoundActive = false;
+      roundWon = won; 
+      uiInput.disabled = true;
+      actionButtons.style.display = 'none';
+      btnNext.style.display = 'block';
+
+      world.polygonsData(countriesData);
+      
+      const currentPov = world.pointOfView();
+      world.pointOfView({ ...currentPov, altitude: ZOOM_ALTITUDE * 2 }, 1500);
+
+      if (won) {
+        uiMessage.innerText = 'Correct! It was ' + currentTarget.properties.ADMIN;
+        uiMessage.style.color = '#28a745'; 
+      } else {
+        uiMessage.innerText = 'Out of guesses! It was ' + currentTarget.properties.ADMIN;
+        uiMessage.style.color = '#dc3545'; 
+      }
+    }
+
+    // --- Event Listeners ---
+    btnGuess.addEventListener('click', handleGuess);
+    
+    uiInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleGuess();
+    });
+
+    btnGiveUp.addEventListener('click', () => {
+      if (isRoundActive) endRound(false);
+    });
+
+    btnNext.addEventListener('click', startNewRound);
+
+    window.addEventListener('resize', () => {
+      world.width(window.innerWidth);
+      world.height(window.innerHeight);
+    });
+  </script>
+</body>
+</html>
