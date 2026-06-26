@@ -23,24 +23,54 @@
       height: 100vh;
     }
 
+    /* Top Right Settings Button */
+    #btn-open-settings {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      background: rgba(20, 25, 30, 0.8);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 1.5rem;
+      padding: 8px 12px;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 15;
+      transition: background 0.2s;
+    }
+    #btn-open-settings:hover { background: rgba(50, 60, 70, 0.9); }
+
     /* Game UI Panel Overlay */
     #ui-panel {
       position: absolute;
-      top: 20px;
-      left: 20px;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
       background: rgba(20, 25, 30, 0.9);
       color: white;
-      padding: 25px;
+      padding: 20px;
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.8);
       z-index: 10;
-      width: 300px;
+      width: min(90vw, 350px); /* Mobile friendly width */
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-sizing: border-box;
     }
 
     h1 {
-      margin: 0 0 15px 0;
+      margin: 0 0 10px 0;
       font-size: 1.5rem;
       text-align: center;
+    }
+
+    /* Used for the "Find: Country Name" prompt */
+    #target-prompt {
+      display: none; 
+      font-size: 1.2rem;
+      text-align: center;
+      margin-bottom: 15px;
+      color: #00ffff;
+      font-weight: bold;
     }
 
     .status-text {
@@ -52,13 +82,19 @@
 
     input[type="text"] {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       box-sizing: border-box;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       border: 1px solid #555;
       border-radius: 6px;
       background: #2a2a2a;
       color: white;
+      font-size: 16px; /* 16px prevents iOS auto-zoom */
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #00ffff;
     }
 
     .btn-group {
@@ -69,13 +105,16 @@
 
     button {
       flex: 1;
-      padding: 10px;
+      padding: 12px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
+      font-size: 1rem;
     }
+
+    button:active { transform: scale(0.98); }
 
     #btn-guess { background-color: #28a745; color: white; }
     #btn-guess:hover { background-color: #218838; }
@@ -89,11 +128,118 @@
     #message {
       text-align: center;
       font-weight: bold;
-      min-height: 20px;
+      min-height: 25px;
+      font-size: 1.1rem;
     }
+
+    /* Settings Modal */
+    #settings-modal {
+      display: none; /* Hidden by default */
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1a1e23;
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      border: 1px solid #444;
+      z-index: 20;
+      width: min(90vw, 400px);
+      box-shadow: 0 15px 50px rgba(0,0,0,0.9);
+      box-sizing: border-box;
+    }
+
+    #settings-modal h2 {
+      margin-top: 0;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+
+    .setting-row {
+      margin-bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .setting-row label { font-weight: bold; font-size: 0.95rem; }
+    
+    .setting-row select, .setting-row input[type="number"] {
+      padding: 8px;
+      background: #2a2a2a;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .checkbox-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-row input { transform: scale(1.2); }
+
+    #btn-save-settings {
+      width: 100%;
+      background: #00ffff;
+      color: black;
+      margin-top: 10px;
+    }
+    #btn-save-settings:hover { background: #00cccc; }
+
+    /* Modal Background Overlay */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.7);
+      z-index: 19;
+    }
+
   </style>
 </head>
 <body>
+
+  <button id="btn-open-settings">⚙️</button>
+
+  <div id="modal-overlay"></div>
+  <div id="settings-modal">
+    <h2>Game Settings</h2>
+    
+    <div class="setting-row">
+      <label>Game Mode</label>
+      <select id="config-mode">
+        <option value="name">Guess the Name (Camera points at country)</option>
+        <option value="click">Find on Map (Click the globe)</option>
+      </select>
+    </div>
+
+    <div class="setting-row">
+      <label>Number of Guesses Allowed</label>
+      <input type="number" id="config-guesses" min="1" max="10" value="3">
+    </div>
+
+    <div class="setting-row checkbox-row">
+      <input type="checkbox" id="config-autocomplete" checked>
+      <label for="config-autocomplete">Enable Autocomplete</label>
+    </div>
+
+    <div class="setting-row">
+      <label>Country Removal Logic</label>
+      <select id="config-removal">
+        <option value="right">Remove when guessed correctly</option>
+        <option value="training">Training (Remove if right, repeat soon if wrong)</option>
+        <option value="always">Remove always (Right or wrong)</option>
+        <option value="never">Never remove (Infinite mode)</option>
+      </select>
+    </div>
+
+    <button id="btn-save-settings">Save & Restart Game</button>
+  </div>
 
   <div id="ui-panel">
     <h1>Globe Guesser</h1>
@@ -101,8 +247,12 @@
       Guesses remaining: <span id="guesses-left"></span>
     </div>
     
-    <input type="text" id="country-input" list="country-list" placeholder="Enter country name..." autocomplete="off">
-    <datalist id="country-list"></datalist>
+    <div id="target-prompt">Find: <span id="target-country-name"></span></div>
+
+    <div id="input-container">
+      <input type="text" id="country-input" list="country-list" placeholder="Enter country name..." autocomplete="off">
+      <datalist id="country-list"></datalist>
+    </div>
 
     <div class="btn-group" id="action-buttons">
       <button id="btn-guess">Guess</button>
@@ -117,19 +267,25 @@
   <div id="globeViz"></div>
 
   <script>
-    // --- Configuration ---
-    const MAX_GUESSES = 3;
-    const ZOOM_ALTITUDE = 0.4; // Lower number = closer zoom
+    // --- Configuration State ---
+    let config = {
+      gameMode: 'name', // 'name' | 'click'
+      maxGuesses: 3,
+      autocomplete: true,
+      removalMode: 'right' // 'right' | 'training' | 'always' | 'never'
+    };
     
-    // --- State Variables ---
-    let countriesData = [];
+    // --- Game State ---
+    let allCountries = []; // The master list
+    let currentPool = [];  // The "deck" of countries we are currently pulling from
     let currentTarget = null;
-    let guessesRemaining = MAX_GUESSES;
+    let guessesRemaining = config.maxGuesses;
     let isRoundActive = false;
     let roundWon = false; 
 
     // --- DOM Elements ---
     const uiInput = document.getElementById('country-input');
+    const uiInputContainer = document.getElementById('input-container');
     const uiGuessesLeft = document.getElementById('guesses-left');
     const uiMessage = document.getElementById('message');
     const uiDatalist = document.getElementById('country-list');
@@ -137,43 +293,70 @@
     const btnGiveUp = document.getElementById('btn-giveup');
     const btnNext = document.getElementById('btn-next');
     const actionButtons = document.getElementById('action-buttons');
+    const targetPrompt = document.getElementById('target-prompt');
+    const targetCountryName = document.getElementById('target-country-name');
+
+    // Settings DOM
+    const btnOpenSettings = document.getElementById('btn-open-settings');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const settingsModal = document.getElementById('settings-modal');
+    const btnSaveSettings = document.getElementById('btn-save-settings');
 
     // --- Initialize Globe.gl ---
     const world = Globe()
       (document.getElementById('globeViz'))
-      // 1. High-res satellite map
-      .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-      // 2. Bump map for realistic 3D terrain shadows
-      .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-      // 3. Lowered altitude to sit flush against the globe
-      .polygonAltitude(0.002)
-      .polygonStrokeColor(() => '#fff')
+      .globeImageUrl('https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg')
+      .bumpImageUrl('https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-topology.png')
+      .polygonAltitude(0.005)
+      .polygonSideColor(() => 'rgba(0, 0, 0, 0)') 
+      .polygonStrokeColor(() => '#00FFFF') 
       .polygonCapColor((feat) => {
         if (currentTarget && feat === currentTarget) {
-          if (isRoundActive) {
-            return 'rgba(255, 193, 7, 0.8)'; // Yellow
-          } else if (roundWon) {
-            return 'rgba(40, 167, 69, 0.8)'; // Green
-          } else {
-            return 'rgba(220, 53, 69, 0.8)'; // Red
+          if (config.gameMode === 'click' && isRoundActive) {
+            // In 'click' mode, don't give away the answer by highlighting it yellow!
+            return 'rgba(200, 200, 200, 0.1)'; 
           }
+          if (isRoundActive) return 'rgba(255, 193, 7, 0.8)'; // Yellow in 'name' mode
+          if (roundWon) return 'rgba(40, 167, 69, 0.8)'; // Green
+          return 'rgba(220, 53, 69, 0.8)'; // Red
         }
-        return 'rgba(200, 200, 200, 0.2)';
+        return 'rgba(200, 200, 200, 0.1)'; 
       });
+
+    // Handle Globe Clicks (For Game Mode 2)
+    world.onPolygonClick(polygon => {
+      if (!isRoundActive || config.gameMode !== 'click') return;
+
+      if (polygon === currentTarget) {
+        endRound(true);
+      } else {
+        guessesRemaining--;
+        uiGuessesLeft.innerText = guessesRemaining;
+        
+        if (guessesRemaining <= 0) {
+          endRound(false);
+        } else {
+          uiMessage.innerText = `Incorrect! That was ${polygon.properties.ADMIN}.`;
+          uiMessage.style.color = '#ffc107'; 
+        }
+      }
+    });
 
     // --- Fetch GeoJSON Data ---
     fetch('https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
       .then(res => res.json())
       .then(data => {
-        countriesData = data.features.filter(d => d.properties.ADMIN !== 'Antarctica');
-        world.polygonsData(countriesData);
+        allCountries = data.features.filter(d => d.properties.ADMIN !== 'Antarctica');
+        world.polygonsData(allCountries);
         populateDatalist();
+        refillPool();
         startNewRound();
       });
 
-    // --- Core Functions ---
+    // --- Data Management Functions ---
     function populateDatalist() {
-      const names = countriesData.map(c => c.properties.ADMIN).sort();
+      uiDatalist.innerHTML = '';
+      const names = allCountries.map(c => c.properties.ADMIN).sort();
       names.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
@@ -181,6 +364,19 @@
       });
     }
 
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function refillPool() {
+      currentPool = [...allCountries];
+      shuffleArray(currentPool);
+    }
+
+    // --- Geometry Helper ---
     function getPolygonCenter(geometry) {
       let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
       const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates[0][0];
@@ -194,32 +390,55 @@
       return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
     }
 
+    // --- Core Game Loop ---
     function startNewRound() {
+      // Ensure we have countries left
+      if (currentPool.length === 0) refillPool();
+
+      // Draw top card from the deck
+      currentTarget = currentPool.shift(); 
+      
       isRoundActive = true;
-      guessesRemaining = MAX_GUESSES;
+      guessesRemaining = config.maxGuesses;
       roundWon = false; 
-      uiInput.value = '';
-      uiInput.disabled = false;
       
       uiGuessesLeft.innerText = guessesRemaining;
-      uiMessage.innerText = 'Good luck!';
+      uiMessage.innerText = config.gameMode === 'click' ? 'Click the country on the globe!' : 'Good luck!';
       uiMessage.style.color = 'white';
-      actionButtons.style.display = 'flex';
       btnNext.style.display = 'none';
+      world.polygonsData(allCountries); // Force color redraw
 
-      const randomIndex = Math.floor(Math.random() * countriesData.length);
-      currentTarget = countriesData[randomIndex];
+      // Apply UI state based on Game Mode
+      if (config.gameMode === 'name') {
+        uiInputContainer.style.display = 'block';
+        actionButtons.style.display = 'flex';
+        targetPrompt.style.display = 'none';
+        
+        uiInput.value = '';
+        uiInput.disabled = false;
+        uiInput.focus();
 
-      world.polygonsData(countriesData);
+        // Point camera AT the country
+        const center = getPolygonCenter(currentTarget.geometry);
+        world.pointOfView({ lat: center.lat, lng: center.lng, altitude: 0.4 }, 2000);
 
-      const center = getPolygonCenter(currentTarget.geometry);
-      world.pointOfView({ lat: center.lat, lng: center.lng, altitude: ZOOM_ALTITUDE }, 2000);
-      
-      uiInput.focus();
+      } else {
+        // "Find on Map" Mode
+        uiInputContainer.style.display = 'none';
+        btnGuess.style.display = 'none'; // Only need give up button
+        actionButtons.style.display = 'flex';
+        targetPrompt.style.display = 'block';
+        targetCountryName.innerText = currentTarget.properties.ADMIN;
+
+        // Move camera to a random zoomed-out position so we don't give it away
+        const randomLat = (Math.random() - 0.5) * 100;
+        const randomLng = (Math.random() - 0.5) * 360;
+        world.pointOfView({ lat: randomLat, lng: randomLng, altitude: 2.0 }, 2000);
+      }
     }
 
-    function handleGuess() {
-      if (!isRoundActive) return;
+    function handleTextGuess() {
+      if (!isRoundActive || config.gameMode !== 'name') return;
 
       const userGuess = uiInput.value.trim().toLowerCase();
       const correctAnswer = currentTarget.properties.ADMIN.toLowerCase();
@@ -244,40 +463,97 @@
     function endRound(won) {
       isRoundActive = false;
       roundWon = won; 
+      
       uiInput.disabled = true;
       actionButtons.style.display = 'none';
+      btnGuess.style.display = 'block'; // Reset for next time mode switches
       btnNext.style.display = 'block';
 
-      world.polygonsData(countriesData);
+      // --- Country Pool Removal Logic ---
+      if (config.removalMode === 'always') {
+        // Do nothing (it was already shifted out of the pool)
+      } else if (config.removalMode === 'right') {
+        if (!won) currentPool.push(currentTarget); // Put back at the bottom of the deck
+      } else if (config.removalMode === 'training') {
+        if (!won) {
+          // Insert back near the top of the deck (1 to 3 cards deep)
+          const insertPos = Math.min(currentPool.length, Math.floor(Math.random() * 3) + 1);
+          currentPool.splice(insertPos, 0, currentTarget);
+        }
+      } else if (config.removalMode === 'never') {
+        currentPool.push(currentTarget); // Always put it back
+      }
+
+      world.polygonsData(allCountries); // Force redraw to show Green/Red
       
-      const currentPov = world.pointOfView();
-      world.pointOfView({ ...currentPov, altitude: ZOOM_ALTITUDE * 2 }, 1500);
+      // Zoom out to show answer context
+      const center = getPolygonCenter(currentTarget.geometry);
+      world.pointOfView({ lat: center.lat, lng: center.lng, altitude: 1.0 }, 1500);
 
       if (won) {
         uiMessage.innerText = 'Correct! It was ' + currentTarget.properties.ADMIN;
         uiMessage.style.color = '#28a745'; 
       } else {
-        uiMessage.innerText = 'Out of guesses! It was ' + currentTarget.properties.ADMIN;
+        uiMessage.innerText = 'Game Over! It was ' + currentTarget.properties.ADMIN;
         uiMessage.style.color = '#dc3545'; 
       }
     }
 
-    // --- Event Listeners ---
-    btnGuess.addEventListener('click', handleGuess);
-    
+    // --- Input Event Listeners ---
+    btnGuess.addEventListener('click', handleTextGuess);
     uiInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleGuess();
+      if (e.key === 'Enter') handleTextGuess();
     });
-
     btnGiveUp.addEventListener('click', () => {
       if (isRoundActive) endRound(false);
     });
-
     btnNext.addEventListener('click', startNewRound);
 
+    // Responsive design
     window.addEventListener('resize', () => {
       world.width(window.innerWidth);
       world.height(window.innerHeight);
+    });
+
+    // --- Settings Menu Logic ---
+    btnOpenSettings.addEventListener('click', () => {
+      // Sync form with current config
+      document.getElementById('config-mode').value = config.gameMode;
+      document.getElementById('config-guesses').value = config.maxGuesses;
+      document.getElementById('config-autocomplete').checked = config.autocomplete;
+      document.getElementById('config-removal').value = config.removalMode;
+      
+      settingsModal.style.display = 'block';
+      modalOverlay.style.display = 'block';
+    });
+
+    btnSaveSettings.addEventListener('click', () => {
+      // Read form
+      config.gameMode = document.getElementById('config-mode').value;
+      config.maxGuesses = parseInt(document.getElementById('config-guesses').value) || 1;
+      config.autocomplete = document.getElementById('config-autocomplete').checked;
+      config.removalMode = document.getElementById('config-removal').value;
+
+      // Apply autocomplete toggle
+      if (config.autocomplete) {
+        uiInput.setAttribute('list', 'country-list');
+      } else {
+        uiInput.removeAttribute('list');
+      }
+
+      // Hide modal
+      settingsModal.style.display = 'none';
+      modalOverlay.style.display = 'none';
+
+      // Restart Game fully on save
+      refillPool();
+      startNewRound();
+    });
+
+    // Close modal if overlay is clicked
+    modalOverlay.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+      modalOverlay.style.display = 'none';
     });
   </script>
 </body>
